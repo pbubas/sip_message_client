@@ -1,0 +1,53 @@
+class SipServerResponse:
+    def __init__(self, code, header, body):
+        self.code = code
+        self.header = header
+        self.body = body
+        self.ok = True if "202 Accepted" in code else False
+
+    @property
+    def encoded(self):
+        header=dict()
+        header = {k:v for k,v in self.header.items()}
+        try:
+            header['WWW-Authenticate'] = ''.join(f'{k}={v}, ' for k,v in header['WWW-Authenticate'].items()).rstrip(', ')
+        except KeyError:
+            pass
+        message = f'{self.code}\r\n' + ''.join(f'{k}: {v}\r\n' for k,v in header.items())
+        message = message + '\r\n' + self.body
+        return message.encode()
+
+    @classmethod
+    def decode(cls, binary: bytes):
+        code, header = binary.decode().split("\r\n", 1)
+        header = header.split("\r\n")
+        body=header[-1]
+        header_lines = map(SipServerResponse._header_line_to_dict, header)
+        header = dict()
+        header = {items[0]:items[1] for items in header_lines if items}
+        try: 
+            header['WWW-Authenticate'] = SipServerResponse._parameters_to_dict(header['WWW-Authenticate'], ",")
+        except KeyError:
+            pass
+        try: 
+            header['Via'] = SipServerResponse._parameters_to_dict(header['Via'], ";")
+        except KeyError:
+            pass
+        return cls(code, header, body)
+
+    @staticmethod
+    def _header_line_to_dict(header_line: str):
+        try:
+            key, value = header_line.split(":", 1)
+        except ValueError:
+            return None
+        return key, value.strip()
+
+    @staticmethod
+    def _parameters_to_dict(parameters: str, split: str):
+        parameters = parameters.split(f'{split}')
+        parameters_dict = {parameter.split("=")[0].strip():parameter.split("=")[1].strip() for parameter in parameters if "=" in parameter}
+        return parameters_dict
+
+
+
