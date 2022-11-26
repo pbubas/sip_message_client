@@ -44,9 +44,12 @@ class SipServerResponse:
         return key, value.strip()
 
     @staticmethod
-    def _parameters_to_dict(parameters: str, split: str):
-        parameters = parameters.split(f'{split}')
-        parameters_dict = {parameter.split("=")[0].strip():parameter.split("=")[1].strip() for parameter in parameters if "=" in parameter}
+    def _parameters_to_dict(parameters: str, seperator: str):
+        parameters = parameters.split(f'{seperator}')
+        parameters_dict = {
+            parameter.split("=")[0].strip():parameter.split("=")[1].strip()
+            for parameter in parameters 
+            if "=" in parameter}
         return parameters_dict
 
 
