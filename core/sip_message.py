@@ -1,3 +1,5 @@
+import logging
+
 from dataclasses import dataclass
 from .sip_server_response import SipServerResponse
 
@@ -6,6 +8,8 @@ import random
 import string
 import uuid
 from hashlib import md5,sha256
+
+LOG = logging.getLogger(__name__)
 
 @dataclass()
 class SipClient:
@@ -35,20 +39,38 @@ class SipMessage:
             self._set_branchid()
             self._set_tag()
             self._set_callid()
-            self.counter=1
+            self.seq_num=1
 
             self._build_message()
             sip_server_udp.sendto(self.request, (self.sip_server.ip, self.sip_server.port))
             response_data, address = sip_server_udp.recvfrom(1024)
+            LOG.debug(f'Response:\n{response_data}')
             self.response = SipServerResponse.decode(response_data)
             self.my_port = self.response.header['Via']['rport']
             self.my_ip = self.response.header['Via']['received']
 
-            self.counter+=1
-            self._build_message(self.response.header['WWW-Authenticate'])
+            self.seq_num+=1
+            try:
+                self._build_message(self.response.header['WWW-Authenticate'])
+            except KeyError:
+                error_message=(f'"WWW-Authenticate" not present in server response '
+                               f'check username: "{self.sip_server.user}"')
+                LOG.error(error_message)
+                return self.response
             sip_server_udp.sendto(self.request, (self.sip_server.ip, self.sip_server.port))
             response_data, address = sip_server_udp.recvfrom(1024)
+            LOG.debug(f'Response:\n{response_data}')
             self.response = SipServerResponse.decode(response_data)
+            if "403 Forbidden" in self.response.code:
+                LOG.error('wrong authentication, '
+                          'check password')
+            elif self.response.ok:
+                message=f'Sent message: "{self.message_text}" to "{self.to}"'
+                LOG.info(message)
+            else:
+                message=(f'Failed to send message: "{self.message_text}" to "{self.to}", '
+                         f'"{self.response.code}"')
+                LOG.info(message)
             return self.response
 
     def _build_message(self, www_authenticate=None):
@@ -60,7 +82,7 @@ class SipMessage:
             'To': f'<sip:{self.to}@{self.sip_server.ip};transport=UDP>',
             'From': f'<sip:{self.sip_server.user}@{self.sip_server.ip};transport=UDP>;tag={self.tag}',
             'Call-ID': f'{self.call_id}',
-            'CSeq': f'{self.counter} MESSAGE',
+            'CSeq': f'{self.seq_num} MESSAGE',
             'Allow': 'INVITE, ACK, CANCEL, BYE, NOTIFY, REFER, MESSAGE, OPTIONS, INFO, SUBSCRIBE',
             'Content-Type': 'text/plain',
             'User-Agent': 'SipSmsMessage',
@@ -95,10 +117,9 @@ class SipMessage:
     def _set_callid(self):
         characters = string.ascii_letters + string.digits + string.punctuation
         call_id = ''.join(random.choice(characters) for i in range(24))
-        self.call_id = call_id
-        hash = sha256(str(self.call_id).encode("utf8"))
+        hash = sha256(str(call_id).encode("utf-8"))
         hhash = hash.hexdigest()
-        return f"{hhash[0:32]}@{self.my_ip}:{self.my_port}"
+        self.call_id = f"{hhash[0:32]}@{self.my_ip}:{self.my_port}"
 
     def _set_branchid(self) -> str:
         branchid = uuid.uuid4().hex[: 25]
