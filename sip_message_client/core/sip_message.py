@@ -9,7 +9,8 @@ import string
 import uuid
 from hashlib import md5,sha256
 
-LOG = logging.getLogger(__name__)
+
+logging = logging.getLogger(__name__)
 
 @dataclass()
 class SipClient:
@@ -36,6 +37,7 @@ class SipMessage:
         self.my_port = 5060
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sip_server_udp:
+            sip_server_udp.settimeout(5)
             self._set_branchid()
             self._set_tag()
             self._set_callid()
@@ -43,8 +45,12 @@ class SipMessage:
 
             self._build_message()
             sip_server_udp.sendto(self.request, (self.sip_server.ip, self.sip_server.port))
-            response_data, address = sip_server_udp.recvfrom(1024)
-            LOG.debug(f'Response:\n{response_data}')
+            try:
+                response_data, address = sip_server_udp.recvfrom(1024)
+                logging.debug(f'Response:\n{response_data}')
+            except socket.timeout:
+                logging.error(f'No data receiver from {self.sip_server.ip}:{self.sip_server.port}')
+                return
             self.response = SipServerResponse.decode(response_data)
             self.my_port = self.response.header['Via']['rport']
             self.my_ip = self.response.header['Via']['received']
@@ -55,22 +61,22 @@ class SipMessage:
             except KeyError:
                 error_message=(f'"WWW-Authenticate" not present in server response '
                                f'check username: "{self.sip_server.user}"')
-                LOG.error(error_message)
+                logging.error(error_message)
                 return self.response
             sip_server_udp.sendto(self.request, (self.sip_server.ip, self.sip_server.port))
             response_data, address = sip_server_udp.recvfrom(1024)
-            LOG.debug(f'Response:\n{response_data}')
+            logging.debug(f'Response:\n{response_data}')
             self.response = SipServerResponse.decode(response_data)
             if "403 Forbidden" in self.response.code:
-                LOG.error('wrong authentication, '
+                logging.error('wrong authentication, '
                           'check password')
             elif self.response.ok:
                 message=f'Sent message: "{self.message_text}" to "{self.to}"'
-                LOG.info(message)
+                logging.info(message)
             else:
                 message=(f'Failed to send message: "{self.message_text}" to "{self.to}", '
                          f'"{self.response.code}"')
-                LOG.info(message)
+                logging.error(message)
             return self.response
 
     def _build_message(self, www_authenticate=None):

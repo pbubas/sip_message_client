@@ -1,9 +1,8 @@
-from core.sip_message import SipClient
+from sip_message_client import SipClient
 import logging
-from sys import stdout
 
-logging.basicConfig(level=logging.INFO, stream=stdout)
-LOG = logging.getLogger()
+logging.basicConfig(level=logging.INFO)
+logging = logging.getLogger()
 
 if __name__ == "__main__":
     sip_client = SipClient("10.0.0.15", 5060, "sipuser", "password")
