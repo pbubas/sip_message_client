@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "sip-message-client"
+version = "0.1.0"
+description = "simple python socket app to send sms via sip server"
+authors = ["Przemyslaw Bubas <bprzemys@cisco.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
