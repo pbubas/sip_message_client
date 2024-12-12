@@ -22,15 +22,15 @@ class SipServerResponse:
         code, header = binary.decode().split("\r\n", 1)
         header = header.split("\r\n")
         body=header[-1]
-        header_lines = map(SipServerResponse._header_line_to_dict, header)
+        header_lines = map(cls._header_line_to_dict, header)
         header = dict()
         header = {items[0]:items[1] for items in header_lines if items}
+        if 'WWW-Authenticate' in header:
+            scheme, www_authenticate = header['WWW-Authenticate'].split(' ', 1)
+            header['WWW-Authenticate'] = cls._parameters_to_dict(www_authenticate, ",")
+            header['WWW-Authenticate']['scheme'] = scheme
         try: 
-            header['WWW-Authenticate'] = SipServerResponse._parameters_to_dict(header['WWW-Authenticate'], ",")
-        except KeyError:
-            pass
-        try: 
-            header['Via'] = SipServerResponse._parameters_to_dict(header['Via'], ";")
+            header['Via'] = cls._parameters_to_dict(header['Via'], ";")
         except KeyError:
             pass
         return cls(code, header, body)
@@ -49,3 +49,4 @@ class SipServerResponse:
         parameters = filter(lambda x: "=" in x, parameters)
         parameters = map(lambda x: x.split("="), parameters)
         return {k.strip():v.strip() for k,v in parameters}
+    

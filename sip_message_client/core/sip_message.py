@@ -58,8 +58,9 @@ class SipMessage:
             self.seq_num+=1
             try:
                 self._build_message(self.response.header['WWW-Authenticate'])
-            except KeyError:
-                error_message=(f'"WWW-Authenticate" not present in server response '
+            except KeyError as e:
+                error_message=(f'KeyError: {e}, '
+                               f'"WWW-Authenticate" not present in server response '
                                f'check username: "{self.sip_server.user}"')
                 logging.error(error_message)
                 return self.response
@@ -97,9 +98,10 @@ class SipMessage:
         }
         if www_authenticate:
             header['Authorization'] = self._build_authorization(www_authenticate)
+            
         request = method + '\r\n'
-        request = request + '\r\n'.join(f'{k}: {v}' for k,v in header.items())
-        request = request + '\r\n' + self.message_text
+        request = request + '\r\n'.join(f'{k}: {v}' for k,v in header.items()) + '\r\n'
+        request = request + '\r\n' +  self.message_text + '\r\n'
         self.method = method
         self.header = header
         self.request = request.encode()
@@ -107,17 +109,17 @@ class SipMessage:
     def _build_authorization(self, www_authenticate):
         nonce = www_authenticate['nonce'].strip('"')
         realm = www_authenticate['realm'].strip('"')
-        algorithim = www_authenticate['Digest algorithm']
         hash1 = md5(f'{self.sip_server.user}:{realm}:{self.sip_server.password}'.encode('utf-8')).hexdigest()
         hash2 = md5(f'MESSAGE:sip:{self.sip_server.ip};transport=UDP'.encode('utf-8')).hexdigest()
         response = md5(f'{hash1}:{nonce}:{hash2}'.encode('utf-8')).hexdigest()
         return (
-            f'Digest username="{self.sip_server.user}",'
-            f'realm={realm},'
-            f'nonce={nonce},'
+            f'{www_authenticate["scheme"]} '
+            f'username="{self.sip_server.user}",'
+            f'realm={www_authenticate["realm"]},'
+            f'nonce={www_authenticate["nonce"]},'
             f'uri="sip:{self.sip_server.ip};transport=UDP",'
             f'response="{response}",'
-            f'algorithm={algorithim}\r\n'
+            f'algorithm={www_authenticate["algorithm"]}'
         )
 
     def _set_callid(self):
