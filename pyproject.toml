@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sip-message-client"
-version = "0.1.1"
+version = "0.1.2"
 description = "simple python socket app to send sms via sip server"
 authors = ["Przemyslaw Bubas <bprzemys@cisco.com>"]
 readme = "README.md"
