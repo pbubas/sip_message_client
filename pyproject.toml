@@ -14,5 +14,5 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.package]
 packages = [
-    { include = "sip_message_client", from = "src" }
+    { include = "sip_message_client", from = "src/" }
 ]
